@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pretext — 纯 JS 多行文本测量与排版库</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0c0f;
+  --bg-elevated: #141418;
+  --bg-card: #1a1a20;
+  --surface: #22222a;
+  --border: #2a2a35;
+  --text: #e8e6e1;
+  --text-secondary: #8a8a95;
+  --accent: #c97b4b;
+  --accent-light: #e6a06c;
+  --accent-dim: rgba(201, 123, 75, 0.12);
+  --green: #6a9b6c;
+  --blue: #6a8fcc;
+  --font-display: 'Space Grotesk', 'Noto Sans SC', sans-serif;
+  --font-body: 'Noto Sans SC', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection { background: var(--accent-dim); color: var(--accent-light); }
+
+a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+a:hover { color: var(--accent-light); }
+
+/* ── Grain overlay ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: repeating-conic-gradient(rgba(255,255,255,0.012) 0% 25%, transparent 0% 50%);
+  background-size: 3px 3px;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Container ── */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 clamp(1.5rem, 5vw, 4rem); }
+
+/* ── Navigation ── */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 1rem 0;
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  background: rgba(12, 12, 15, 0.8);
+  border-bottom: 1px solid var(--border);
+  transition: transform 0.4s var(--ease-out);
+}
+nav .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-logo {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.nav-logo .dot {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+.nav-links { display: flex; gap: 2rem; align-items: center; }
+.nav-links a {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-install {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--accent) !important;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.nav-install:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+/* ── Hero ── */
+.hero {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  padding: 8rem 0 6rem;
+  position: relative;
+}
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: center;
+}
+.hero-content { position: relative; z-index: 2; }
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 0.35rem 1rem;
+  border-radius: 100px;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(201, 123, 75, 0.2);
+}
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 6vw, 5rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  margin-bottom: 1.5rem;
+}
+.hero h1 .gradient-text {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 50%, var(--blue) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero-desc {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+  max-width: 48ch;
+  line-height: 1.8;
+  margin-bottom: 2.5rem;
+}
+.hero-actions { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.75rem;
+  background: var(--accent);
+  color: #0c0c0f;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s var(--ease-elastic);
+}
+.btn-primary:hover { transform: translateY(-2px); background: var(--accent-light); color: #0c0c0f; }
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.75rem;
+  background: transparent;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 0.95rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.25s var(--ease-out);
+}
+.btn-secondary:hover { border-color: var(--text-secondary); transform: translateY(-1px); }
+
+/* Hero visual */
+.hero-visual {
+  position: relative;
+  height: 440px;
+}
+.hero-canvas {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.canvas-bar {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.canvas-dot { width: 10px; height: 10px; border-radius: 50%; }
+.canvas-dot:nth-child(1) { background: #ff5f57; }
+.canvas-dot:nth-child(2) { background: #febc2e; }
+.canvas-dot:nth-child(3) { background: #28c840; }
+.canvas-body {
+  flex: 1;
+  padding: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.9;
+  color: var(--text-secondary);
+  overflow: hidden;
+}
+.canvas-body .kw { color: var(--accent); }
+.canvas-body .fn { color: var(--blue); }
+.canvas-body .str { color: var(--green); }
+.canvas-body .cm { color: #555; font-style: italic; }
+.canvas-body .num { color: var(--accent-light); }
+
+/* Floating badges on hero visual */
+.float-badge {
+  position: absolute;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  z-index: 3;
+  animation: float 4s ease-in-out infinite;
+  white-space: nowrap;
+}
+.float-badge.perf {
+  top: -16px;
+  right: -10px;
+  background: rgba(106, 155, 108, 0.15);
+  color: var(--green);
+  border-color: rgba(106, 155, 108, 0.3);
+  animation-delay: 0s;
+}
+.float-badge.zero {
+  bottom: 40px;
+  left: -20px;
+  background: rgba(106, 143, 204, 0.15);
+  color: var(--blue);
+  border-color: rgba(106, 143, 204, 0.3);
+  animation-delay: 1.5s;
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* ── Stats ── */
+.stats {
+  padding: 4rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+}
+.stat-item { text-align: center; }
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--accent);
+}
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+/* ── Section ── */
+section { padding: 6rem 0; }
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 1rem;
+}
+.section-desc {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  max-width: 60ch;
+  line-height: 1.8;
+  margin-bottom: 3rem;
+}
+
+/* ── Features bento ── */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto auto;
+  gap: 1.25rem;
+}
+.feature-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2rem;
+  transition: all 0.35s var(--ease-out);
+  position: relative;
+  overflow: hidden;
+}
+.feature-card:hover {
+  border-color: rgba(201, 123, 75, 0.3);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+.feature-card.wide { grid-column: span 2; }
+.feature-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  margin-bottom: 1.25rem;
+  background: var(--accent-dim);
+  border: 1px solid rgba(201, 123, 75, 0.2);
+}
+.feature-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.75rem;
+}
+.feature-card p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+/* ── Code section ── */
+.code-section { border-top: 1px solid var(--border); }
+.code-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+.code-tab {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: var(--font-body);
+}
+.code-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.code-tab:hover { color: var(--text); }
+.code-panel {
+  display: none;
+  animation: fadeIn 0.3s var(--ease-out);
+}
+.code-panel.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.code-block {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.code-header {
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.code-lang {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.code-copy {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: all 0.2s;
+}
+.code-copy:hover { border-color: var(--accent); color: var(--accent); }
+pre {
+  padding: 1.5rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+pre .kw { color: var(--accent); }
+pre .fn { color: var(--blue); }
+pre .str { color: var(--green); }
+pre .cm { color: #555; font-style: italic; }
+pre .num { color: var(--accent-light); }
+pre .type { color: #b898c9; }
+
+/* ── Use cases ── */
+.usecases-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+.usecase-card {
+  padding: 1.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  transition: all 0.3s var(--ease-out);
+  position: relative;
+}
+.usecase-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.usecase-card::before {
+  content: attr(data-num);
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 900;
+  position: absolute;
+  top: 1rem;
+  right: 1.5rem;
+  color: var(--surface);
+  line-height: 1;
+}
+.usecase-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+}
+.usecase-card p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+/* ── API Reference ── */
+.api-section { border-top: 1px solid var(--border); }
+.api-grid { display: grid; gap: 1.25rem; }
+.api-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.75rem;
+  transition: border-color 0.2s;
+}
+.api-card:hover { border-color: rgba(201, 123, 75, 0.3); }
+.api-signature {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--blue);
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+  word-break: break-word;
+}
+.api-card p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+.api-group-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 2.5rem 0 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  letter-spacing: -0.02em;
+}
+.api-group-title:first-of-type { margin-top: 0; }
+
+/* ── Notes ── */
+.notes-section {
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.notes-list {
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+}
+.notes-list li {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  padding: 0.75rem 1rem;
+  border-left: 2px solid var(--border);
+  line-height: 1.7;
+  transition: border-color 0.2s;
+}
+.notes-list li:hover { border-left-color: var(--accent); }
+.notes-list li code {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  background: var(--surface);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  color: var(--accent);
+}
+
+/* ── Footer ── */
+footer {
+  padding: 4rem 0;
+  border-top: 1px solid var(--border);
+}
+.footer-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.footer-left {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.footer-links { display: flex; gap: 2rem; }
+.footer-links a {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.footer-links a:hover { color: var(--accent); }
+
+/* ── Scroll reveal ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 3rem; }
+  .hero-visual { height: 360px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .features-grid { grid-template-columns: 1fr; }
+  .feature-card.wide { grid-column: span 1; }
+  .usecases-grid { grid-template-columns: 1fr; }
+  .nav-links { display: none; }
+}
+@media (max-width: 600px) {
+  .hero { padding: 7rem 0 3rem; }
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .hero-visual { height: 300px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav>
+  <div class="container">
+    <div class="nav-logo">
+      <span class="dot"></span>
+      Pretext
+    </div>
+    <div class="nav-links">
+      <a href="#features">特性</a>
+      <a href="#usage">用法</a>
+      <a href="#api">API</a>
+      <a href="#notes">注意事项</a>
+      <a href="https://github.com/chenglou/pretext" target="_blank">GitHub</a>
+      <a class="nav-install" onclick="copyInstall()" title="点击复制">npm i @chenglou/pretext</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-grid">
+      <div class="hero-content reveal">
+        <div class="hero-badge">⚡ 纯 JavaScript / TypeScript</div>
+        <h1>
+          多行文本<br>
+          <span class="gradient-text">测量与排版</span>
+        </h1>
+        <p class="hero-desc">
+          快速、精确，支持你甚至不知道存在的各种语言。绕过 DOM 测量，零回流。可渲染到 DOM、Canvas、SVG。
+        </p>
+        <div class="hero-actions">
+          <a href="#usage" class="btn-primary">快速开始 →</a>
+          <a href="https://chenglou.me/pretext/" target="_blank" class="btn-secondary">在线演示</a>
+        </div>
+      </div>
+      <div class="hero-visual reveal" style="transition-delay: 0.15s;">
+        <div class="hero-canvas">
+          <div class="canvas-bar">
+            <span class="canvas-dot"></span>
+            <span class="canvas-dot"></span>
+            <span class="canvas-dot"></span>
+          </div>
+          <div class="canvas-body">
+            <span class="kw">import</span> { prepare, layout } <span class="kw">from</span> <span class="str">'@chenglou/pretext'</span><br><br>
+            <span class="cm">// 一次预处理，反复排版</span><br>
+            <span class="kw">const</span> prepared = <span class="fn">prepare</span>(<br>
+            &nbsp;&nbsp;<span class="str">'AGI 春天到了. بدأت الرحلة 🚀'</span>,<br>
+            &nbsp;&nbsp;<span class="str">'16px Inter'</span><br>
+            )<br><br>
+            <span class="cm">// 纯算术，零 DOM 回流</span><br>
+            <span class="kw">const</span> { height, lineCount } =<br>
+            &nbsp;&nbsp;<span class="fn">layout</span>(prepared, width, <span class="num">20</span>)
+          </div>
+        </div>
+        <div class="float-badge perf">⚡ layout() ≈ 0.09ms / 500条</div>
+        <div class="float-badge zero">🚫 零 DOM 回流</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="container">
+    <div class="stats-grid reveal">
+      <div class="stat-item">
+        <div class="stat-value">~19ms</div>
+        <div class="stat-label">prepare() / 500条文本</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">~0.09ms</div>
+        <div class="stat-label">layout() / 500条文本</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">0</div>
+        <div class="stat-label">DOM 回流次数</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">∞</div>
+        <div class="stat-label">支持语言数量</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Features -->
+<section id="features">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">核心特性</div>
+      <h2 class="section-title">为什么选择 Pretext</h2>
+      <p class="section-desc">绕过 <code style="font-family:var(--font-mono);background:var(--surface);padding:0.15rem 0.4rem;border-radius:4px;font-size:0.9rem;color:var(--accent);">getBoundingClientRect</code> 和 <code style="font-family:var(--font-mono);background:var(--surface);padding:0.15rem 0.4rem;border-radius:4px;font-size:0.9rem;color:var(--accent);">offsetHeight</code>，以浏览器自身的字体引擎作为基准真值。</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card wide reveal">
+        <div class="feature-icon">📐</div>
+        <h3>零回流文本测量</h3>
+        <p>不依赖任何 DOM 测量 API。<code style="font-family:var(--font-mono);color:var(--accent);">prepare()</code> 一次预计算，<code style="font-family:var(--font-mono);color:var(--accent);">layout()</code> 纯算术复用——窗口大小变化时只需重新调用 layout()，无需重新 prepare。</p>
+      </div>
+      <div class="feature-card reveal" style="transition-delay:0.08s;">
+        <div class="feature-icon">🌍</div>
+        <h3>全语言支持</h3>
+        <p>中文、阿拉伯语、Emoji、混合双向文本……你能想到的所有语言和文字系统，并针对特定浏览器怪异行为做了处理。</p>
+      </div>
+      <div class="feature-card reveal" style="transition-delay:0.1s;">
+        <div class="feature-icon">🖼️</div>
+        <h3>多渲染目标</h3>
+        <p>渲染到 DOM、Canvas、SVG、WebGL，服务端渲染即将支持。手动排版每一行，自由控制输出方式。</p>
+      </div>
+      <div class="feature-card reveal" style="transition-delay:0.12s;">
+        <div class="feature-icon">📦</div>
+        <h3>精确虚拟化</h3>
+        <p>无需估算和缓存的精确虚拟化/遮挡剔除。已知高度让你的滚动列表如丝般顺滑。</p>
+      </div>
+      <div class="feature-card wide reveal" style="transition-delay:0.14s;">
+        <div class="feature-icon">🔧</div>
+        <h3>灵活的排版 API</h3>
+        <p>从简单的高度测量到逐行排版，从固定宽度到变宽排版（文字环绕浮动图片），从全量行信息到仅行宽回调——API 覆盖从简到繁的所有场景。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Use cases -->
+<section>
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">应用场景</div>
+      <h2 class="section-title">解锁 Web UI 的关键拼图</h2>
+      <p class="section-desc">返回的高度信息让这些曾经棘手的问题变得简单。</p>
+    </div>
+    <div class="usecases-grid">
+      <div class="usecase-card reveal" data-num="01">
+        <h3>精确虚拟化 / 遮挡剔除</h3>
+        <p>无需估算行高、无需缓存，直接拿到精确高度用于虚拟滚动列表。</p>
+      </div>
+      <div class="usecase-card reveal" data-num="02" style="transition-delay:0.06s;">
+        <h3>高级自定义布局</h3>
+        <p>瀑布流、JS 驱动的类 flexbox 实现、无需 CSS hack 即可微调布局值。</p>
+      </div>
+      <div class="usecase-card reveal" data-num="03" style="transition-delay:0.1s;">
+        <h3>开发阶段 AI 验证</h3>
+        <p>AI 时代自动验证按钮文字不会溢出到下一行，无需打开浏览器。</p>
+      </div>
+      <div class="usecase-card reveal" data-num="04" style="transition-delay:0.14s;">
+        <h3>防止布局偏移</h3>
+        <p>新文本加载前即可知道高度，便于重新锚定滚动位置、消除 CLS。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Code examples -->
+<section id="usage" class="code-section">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">代码示例</div>
+      <h2 class="section-title">两种使用场景</h2>
+      <p class="section-desc">从简单的段落高度测量，到完整的手动行排版。</p>
+    </div>
+
+    <div class="reveal">
+      <div class="code-tabs">
+        <button class="code-tab active" onclick="switchTab(0)">场景一：测量高度</button>
+        <button class="code-tab" onclick="switchTab(1)">场景二：手动排版</button>
+        <button class="code-tab" onclick="switchTab(2)">逐行变宽排版</button>
+        <button class="code-tab" onclick="switchTab(3)">收缩包裹</button>
+      </div>
+
+      <div class="code-panel active" id="panel-0">
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">TypeScript</span>
+            <button class="code-copy" onclick="copyCode(this)">复制</button>
+          </div>
+<pre><span class="kw">import</span> { prepare, layout } <span class="kw">from</span> <span class="str">'@chenglou/pretext'</span>
+
+<span class="cm">// 一次性预处理：规范化、分段、测量</span>
+<span class="kw">const</span> prepared = <span class="fn">prepare</span>(
+  <span class="str">'AGI 春天到了. بدأت الرحلة 🚀'</span>,
+  <span class="str">'16px Inter'</span>
+)
+
+<span class="cm">// 纯算术运算，无 DOM 布局和回流！</span>
+<span class="kw">const</span> { height, lineCount } = <span class="fn">layout</span>(prepared, textWidth, <span class="num">20</span>)
+
+<span class="cm">// pre-wrap 模式：保留空格、制表符和换行</span>
+<span class="kw">const</span> prepared2 = <span class="fn">prepare</span>(
+  textareaValue, <span class="str">'16px Inter'</span>,
+  { whiteSpace: <span class="str">'pre-wrap'</span> }
+)
+<span class="kw">const</span> { height: h2 } = <span class="fn">layout</span>(prepared2, textareaWidth, <span class="num">20</span>)</pre>
+        </div>
+      </div>
+
+      <div class="code-panel" id="panel-1">
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">TypeScript</span>
+            <button class="code-copy" onclick="copyCode(this)">复制</button>
+          </div>
+<pre><span class="kw">import</span> { prepareWithSegments, layoutWithLines } <span class="kw">from</span> <span class="str">'@chenglou/pretext'</span>
+
+<span class="kw">const</span> prepared = <span class="fn">prepareWithSegments</span>(
+  <span class="str">'AGI 春天到了. بدأت الرحلة 🚀'</span>,
+  <span class="str">'18px "Helvetica Neue"'</span>
+)
+
+<span class="cm">// 获取所有行信息</span>
+<span class="kw">const</span> { lines } = <span class="fn">layoutWithLines</span>(prepared, <span class="num">320</span>, <span class="num">26</span>)
+
+<span class="cm">// 渲染到 Canvas</span>
+<span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; lines.length; i++)
+  ctx.<span class="fn">fillText</span>(lines[i].text, <span class="num">0</span>, i * <span class="num">26</span>)</pre>
+        </div>
+      </div>
+
+      <div class="code-panel" id="panel-2">
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">TypeScript — 文字环绕浮动图片</span>
+            <button class="code-copy" onclick="copyCode(this)">复制</button>
+          </div>
+<pre><span class="kw">let</span> cursor = { segmentIndex: <span class="num">0</span>, graphemeIndex: <span class="num">0</span> }
+<span class="kw">let</span> y = <span class="num">0</span>
+
+<span class="cm">// 图片旁边的行更窄，实现文字环绕</span>
+<span class="kw">while</span> (<span class="kw">true</span>) {
+  <span class="kw">const</span> width = y &lt; image.bottom
+    ? columnWidth - image.width
+    : columnWidth
+  <span class="kw">const</span> line = <span class="fn">layoutNextLine</span>(prepared, cursor, width)
+  <span class="kw">if</span> (line === <span class="kw">null</span>) <span class="kw">break</span>
+  ctx.<span class="fn">fillText</span>(line.text, <span class="num">0</span>, y)
+  cursor = line.end
+  y += <span class="num">26</span>
+}</pre>
+        </div>
+      </div>
+
+      <div class="code-panel" id="panel-3">
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">TypeScript — 多行收缩包裹</span>
+            <button class="code-copy" onclick="copyCode(this)">复制</button>
+          </div>
+<pre><span class="cm">// Web 一直缺失的功能：多行"收缩包裹"</span>
+<span class="kw">let</span> maxW = <span class="num">0</span>
+<span class="fn">walkLineRanges</span>(prepared, <span class="num">320</span>, line =&gt; {
+  <span class="kw">if</span> (line.width &gt; maxW) maxW = line.width
+})
+<span class="cm">// maxW 就是最紧凑容器宽度</span>
+<span class="cm">// 可通过二分搜索 + walkLineRanges 找到理想宽度</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- API Reference -->
+<section id="api" class="api-section">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">API 参考</div>
+      <h2 class="section-title">完整接口一览</h2>
+      <p class="section-desc">从简单测量到精细排版，覆盖所有场景。</p>
+    </div>
+
+    <div class="api-grid reveal">
+      <h3 class="api-group-title">场景一：测量段落高度</h3>
+
+      <div class="api-card">
+        <div class="api-signature">prepare(text, font, options?) → PreparedText</div>
+        <p>一次性文本分析 + 测量。规范化空白字符、分段、应用粘连规则、测量分段宽度。返回不透明句柄。<code style="font-family:var(--font-mono);color:var(--accent);">font</code> 格式同 canvas context，如 <code style="font-family:var(--font-mono);color:var(--accent);">16px Inter</code>。options 支持 <code style="font-family:var(--font-mono);color:var(--accent);">{ whiteSpace: 'pre-wrap' }</code>。</p>
+      </div>
+      <div class="api-card">
+        <div class="api-signature">layout(prepared, maxWidth, lineHeight) → { height, lineCount }</div>
+        <p>根据最大宽度和行高计算文本高度。纯算术运算，是低开销热路径。窗口 resize 时只需重新调用 layout()。</p>
+      </div>
+
+      <h3 class="api-group-title">场景二：手动行排版</h3>
+
+      <div class="api-card">
+        <div class="api-signature">prepareWithSegments(text, font, options?) → PreparedTextWithSegments</div>
+        <p>与 prepare() 相同，但返回更丰富的结构以满足手动行排版需求。</p>
+      </div>
+      <div class="api-card">
+        <div class="api-signature">layoutWithLines(prepared, maxWidth, lineHeight) → { height, lineCount, lines }</div>
+        <p>接受固定最大宽度，返回所有行信息（text, width, start, end）。</p>
+      </div>
+      <div class="api-card">
+        <div class="api-signature">walkLineRanges(prepared, maxWidth, onLine) → number</div>
+        <p>底层 API，每行调用回调传入行宽和游标，不构建文本字符串。适用于二分搜索理想宽度、收缩包裹、平衡排版等场景。</p>
+      </div>
+      <div class="api-card">
+        <div class="api-signature">layoutNextLine(prepared, start, maxWidth) → LayoutLine | null</div>
+        <p>迭代器 API，每行可使用不同宽度。返回从 start 开始的一行，段落用尽返回 null。实现文字环绕等效果。</p>
+      </div>
+
+      <h3 class="api-group-title">辅助函数</h3>
+
+      <div class="api-card">
+        <div class="api-signature">clearCache() → void</div>
+        <p>清除 Pretext 内部共享缓存。当应用循环使用大量不同字体或文本变体时可释放累积缓存。</p>
+      </div>
+      <div class="api-card">
+        <div class="api-signature">setLocale(locale?) → void</div>
+        <p>为后续的 prepare() 和 prepareWithSegments() 设置语言环境。内部也会调用 clearCache()。不影响已有的预处理状态。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Notes -->
+<section id="notes" class="notes-section">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">注意事项</div>
+      <h2 class="section-title">使用须知</h2>
+      <p class="section-desc">Pretext 并不试图成为完整的字体渲染引擎，目前针对常见文本设置优化。</p>
+    </div>
+    <ul class="notes-list reveal">
+      <li>默认设置：<code>white-space: normal</code>、<code>word-break: normal</code>、<code>overflow-wrap: break-word</code>、<code>line-break: auto</code></li>
+      <li>传入 <code>{ whiteSpace: 'pre-wrap' }</code> 后，普通空格、<code>\t</code> 制表符和 <code>\n</code> 硬换行将被保留。制表符遵循浏览器默认 <code>tab-size: 8</code></li>
+      <li>在 macOS 上 <code>system-ui</code> 对 layout() 精度不安全，请使用具名字体</li>
+      <li>非常窄的宽度仍可能在单词内部断行，但仅在字素边界处（因为默认包含 <code>overflow-wrap: break-word</code>）</li>
+    </ul>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">
+        Pretext — Sebastian Markbage 十年前通过 text-layout 最早播下了种子
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/chenglou/pretext" target="_blank">GitHub</a>
+        <a href="https://chenglou.me/pretext/" target="_blank">演示</a>
+        <a href="https://github.com/chenglou/pretext/blob/main/DEVELOPMENT.md" target="_blank">开发文档</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Tab switching
+function switchTab(index) {
+  document.querySelectorAll('.code-tab').forEach((t, i) => t.classList.toggle('active', i === index));
+  document.querySelectorAll('.code-panel').forEach((p, i) => p.classList.toggle('active', i === index));
+}
+
+// Copy code
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.textContent).then(() => {
+    btn.textContent = '已复制 ✓';
+    setTimeout(() => btn.textContent = '复制', 1500);
+  });
+}
+
+// Copy install
+function copyInstall() {
+  navigator.clipboard.writeText('npm install @chenglou/pretext').then(() => {
+    const el = document.querySelector('.nav-install');
+    const orig = el.textContent;
+    el.textContent = '已复制 ✓';
+    setTimeout(() => el.textContent = orig, 1500);
+  });
+}
+
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
